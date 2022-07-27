@@ -3,6 +3,10 @@ import numpy as np
 
 def heatmap(data, row_labels, col_labels, ax=None,
             cbar_kw={}, cbarlabel="", **kwargs):
+    
+    # adapted from matplot lib example notbook
+    # https://matplotlib.org/stable/gallery/images_contours_and_fields/image_annotated_heatmap.html
+    
     """
     Create a heatmap from a numpy array and two lists of labels.
 
@@ -61,6 +65,10 @@ def heatmap(data, row_labels, col_labels, ax=None,
 def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
                      textcolors=("black", "white"),
                      threshold=None, **textkw):
+    
+    # adapted from matplot lib example notbook
+    # https://matplotlib.org/stable/gallery/images_contours_and_fields/image_annotated_heatmap.html
+    
     """
     A function to annotate a heatmap.
 
@@ -115,3 +123,59 @@ def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
             texts.append(text)
 
     return texts
+
+def correlation_ratio(df, categorical_feature, numerical_feature):
+    """
+    A function that computes the correlation ratio between a categorical and numerical features. 
+    
+    Parameters
+    ----------
+    df
+        A dataframe with two columns comprising of the categorical and numerical features to be processed.
+    categorical_feature
+        The column name of the categorical feature.
+    numerical_feature
+        The columns name of the numerical feature.
+    
+    Returns
+    -------
+    correlation_ratio
+        The correlation ratio between 0 and 1, where 0 means there are no differences between categories, 
+        and 1 means that all of the differences can be attributed to the categorical differences.
+    """
+    
+    if len(df.columns)<2:
+        raise ValueError("There needs to be at least 2 features in the dataframe.")
+        
+    if categorical_feature not in df.columns:
+        raise ValueError("Categorical feature no in dataframe.")
+        
+    if numerical_feature not in df.columns:
+        raise ValueError("Numerical feature no in dataframe.")
+     
+    # retain only necessary features
+    # accessing the df like this returns a copy, the original df is not altered
+    df = df[[numerical_feature, categorical_feature]]
+    
+    # drop values where either feature is missing
+    df.dropna(axis=0, how='any', inplace=True)
+    
+    # calculate correlation ratio
+    categories = df[categorical_feature].unique()
+    numerator = 0
+    n_total = 0
+    total_mean = df[numerical_feature].mean()
+    
+    for cat in categories:
+        n_cat = (df[categorical_feature] == cat).sum()
+        cat_mean = df[df[categorical_feature] == cat][numerical_feature].mean()
+        
+        numerator += n_cat * (cat_mean - total_mean)**2
+        n_total += n_cat
+    
+    denominator = (n_total-1) * df[numerical_feature].var()
+    
+    return np.sqrt(numerator/denominator)
+        
+    
+        
