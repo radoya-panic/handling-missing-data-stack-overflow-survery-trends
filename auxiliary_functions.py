@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import scipy.stats as ss
 
 def heatmap(data, row_labels, col_labels, ax=None,
             cbar_kw={}, cbarlabel="", **kwargs):
@@ -135,23 +137,22 @@ def correlation_ratio(df, categorical_feature, numerical_feature):
     categorical_feature
         The column name of the categorical feature.
     numerical_feature
-        The columns name of the numerical feature.
+        The column name of the numerical feature.
     
     Returns
     -------
-    correlation_ratio
-        The correlation ratio between 0 and 1, where 0 means there are no differences between categories, 
-        and 1 means that all of the differences can be attributed to the categorical differences.
+    The correlation ratio between 0 and 1, where 0 means there are no differences between categories, 
+    and 1 means that all of the differences can be attributed to the categorical differences.
     """
     
     if len(df.columns)<2:
         raise ValueError("There needs to be at least 2 features in the dataframe.")
         
     if categorical_feature not in df.columns:
-        raise ValueError("Categorical feature no in dataframe.")
+        raise ValueError("Categorical feature not in dataframe.")
         
     if numerical_feature not in df.columns:
-        raise ValueError("Numerical feature no in dataframe.")
+        raise ValueError("Numerical feature not in dataframe.")
      
     # retain only necessary features
     # accessing the df like this returns a copy, the original df is not altered
@@ -176,6 +177,124 @@ def correlation_ratio(df, categorical_feature, numerical_feature):
     denominator = (n_total-1) * df[numerical_feature].var()
     
     return np.sqrt(numerator/denominator)
-        
+
+def uncertainty_coefficient(df, x, y):
+    """
+    The function uncertainty_coefficient(df, x, y) returns the uncertainty coefficient U(X|Y). This should tell you
+    the fraction of X we can predict given Y. This is also known as the entropy coefficient.
     
+    Parameters
+    ----------
+    df
+        A dataframe with two columns comprising of the categorical features to be processed.
+    x
+        The column name of one of the categorical feature.
+    y
+        The column name of the other categorical feature.  
+    
+    Returns
+    -------
+    The uncertainty coefficient which is between 0 and 1. 
+    """
+    if len(df.columns)<2:
+        raise ValueError("There needs to be at least 2 features in the dataframe.")
         
+    if x not in df.columns:
+        raise ValueError("The categorical feature {0} is not in the dataframe.".format(x))
+        
+    if y not in df.columns:
+        raise ValueError("The categorical feature {0} is not in the dataframe.".format(y))
+    
+    # attain a copy of just the two features you need
+    df = df[[x,y]]
+    
+    # drop values where either feature is missing
+    df.dropna(axis=0, how='any', inplace=True)
+    
+    H_X = entropy(df,x)
+    H_X_Y = conditional_entropy(df,x,y)
+    
+    return (H_X - H_X_Y)/H_X
+
+def entropy(df,x):
+    """
+    The function entropy(df,x) returns the entropy E(X). It is the average surprise/information conveyed per event. 
+    
+    Parameters
+    ----------
+    df
+        A dataframe with two columns comprising of the categorical features to be processed.
+    x
+        The column name of one of the categorical feature.
+    
+    Returns
+    -------
+    The entropy. 
+    """
+    
+    if len(df.columns)<2:
+        raise ValueError("There needs to be at least 2 features in the dataframe.")
+        
+    if x not in df.columns:
+        raise ValueError("The categorical feature {0} is not in the dataframe.".format(x))
+    
+    # attain a copy of just the feature you need
+    df = df[x]
+    
+    # drop values where the feature is missing
+    df.dropna(axis=0, how='any', inplace=True)
+
+    # calculate the probability distribution 
+    probs = np.array(df.value_counts())/len(df)
+    
+    # return the entropy, which is the expected value of -log(P(X))
+    return ss.entropy(probs)
+
+def conditional_entropy(df,x,y):
+    """
+    The function conditional_entropy(df,x) returns the entropy E(X|Y). It is the average surprise/information 
+    conveyed per event provided Y. 
+
+    Parameters
+    ----------
+    df
+        A dataframe with two columns comprising of the categorical features to be processed.
+    x
+        The column name of one of the categorical feature.
+    y
+        The column name of the other categorical feature.  
+
+    Returns
+    -------
+    The conditional entropy. 
+    """
+    if len(df.columns)<2:
+        raise ValueError("There needs to be at least 2 features in the dataframe.")
+
+    if x not in df.columns:
+        raise ValueError("The categorical feature {0} is not in the dataframe.".format(x))
+
+    if y not in df.columns:
+        raise ValueError("The categorical feature {0} is not in the dataframe.".format(y))
+
+    # attain a copy of just the two features you need
+    df = df[[x,y]]
+
+    # drop values where either feature is missing
+    df.dropna(axis=0, how='any', inplace=True)
+
+    # create a contingency table and calculate the joint probability dsitribution
+    p_xy = pd.crosstab(df[x],df[y])
+    p_xy = p_xy/len(df)
+    
+    # calculate the probability distribution of just y
+    p_y = df[y].value_counts()/len(df)
+    
+    # calculate the conditionaly entroy 
+    H_X_Y = 0
+    for i in p_xy.index:
+        for j in p_xy.columns:
+            if p_xy.loc[i,j] != 0:
+                H_X_Y += -1 * p_xy.loc[i,j] * np.log(p_xy.loc[i,j]/p_y.loc[j])
+    
+    return H_X_Y
