@@ -3,6 +3,11 @@ import numpy as np
 import pandas as pd
 import scipy.stats as ss
 
+# imports for interactive plots
+import plotly.graph_objects as go
+from ipywidgets import widgets
+
+
 def heatmap(data, row_labels, col_labels, ax=None,
             cbar_kw={}, cbarlabel="", **kwargs):
     
@@ -298,3 +303,101 @@ def conditional_entropy(df,x,y):
                 H_X_Y += -1 * p_xy.loc[i,j] * np.log(p_xy.loc[i,j]/p_y.loc[j])
     
     return H_X_Y
+
+def interactive_comparison(**x):
+    """
+    The function plots an interactive plot using plotly.
+
+    Parameters
+    ----------
+    df
+        A dataframe with features to plot. 
+    compare
+        The feature to compare between.
+    split
+        The categories across which to split the comparison.   
+    """
+    
+    if 'df' not in x:
+        raise Exception('A dataframe was not passed to the function.')
+    if type(x['df']) != pd.core.frame.DataFrame:
+        raise TypeError('The argument df is not of the right type.')
+    if 'compare' not in x:
+        raise Exception('The feature to compare was not passed.')
+    if 'split' not in x:
+        raise Exception('The feature to split the comparison across was not passed.')
+    
+    # extract arguments from x
+    df = x['df']
+    split = x['split']
+    compare = x['compare']
+        
+    # check that features are in the dataframe
+    if split not in df:
+        raise ValueError('The split feature {0} is not in the dataframe.'.format(split))
+    if compare not in df:
+        raise ValueError('The split feature {0} is not in the dataframe.'.format(compare))
+    
+    # extract correct features from df and drop missing values
+    df = df[[split, compare]]
+    df.dropna(inplace=True)
+    
+    
+    # plot features
+    # create widgets for the interactive plot for comparing 2 developer types
+    compare1 = widgets.Dropdown(
+        options=list(df[compare].unique()) + ['Average'],
+        value='Average',
+        description='Compare1: '
+    )
+    compare2 = widgets.Dropdown(
+        options=list(df[compare].unique()) + ['Average'],
+        value='Average',
+        description='Compare2: '
+    )
+    
+    # Assign an empty figure widget with two traces
+    trace1 = go.Histogram(x=df[split],
+                    opacity=0.75, name='Average',histnorm='percent')
+    trace2 = go.Histogram(x=df[split],
+                    opacity=0.75, name='Average',histnorm='percent')
+    g = go.FigureWidget(data=[trace1, trace2],
+                        layout=go.Layout(
+                            barmode='overlay',
+                            autosize=False,
+                            width=1000,
+                            height=1000,
+                            yaxis = {'title':'Percentage'}
+                        ))
+
+    
+    # Now write functions to handle the input to the widgets
+    def response(change):
+        if (compare1.value != 'Average'):
+            x1 = df[df[compare]==compare1.value][split]
+        else:
+            x1 = df[split]
+
+        if (compare2.value != 'Average'):
+            x2 = df[df[compare]==compare2.value][split]
+        else:
+            x2 = df[split]
+
+        with g.batch_update():
+                g.data[0].x = x1
+                g.data[1].x = x2
+                g.layout.barmode = 'overlay'
+                g.layout.yaxis.title = 'Percentage'
+                g.data[0].name = compare1.value
+                g.data[1].name = compare2.value
+
+
+    compare1.observe(response, names="value")
+    compare2.observe(response, names="value")
+
+    # now to activate plot
+    container = widgets.HBox([compare1, compare2])
+    interactice_plot = widgets.VBox([container,g])
+    
+    display(interactice_plot)
+    
